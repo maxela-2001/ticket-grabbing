@@ -16,24 +16,35 @@ const isRingingBell = true
 
 
 // 当前处于场次选择界面
-const contains_date_selection = 
+var is_selecting_date = 
     className("android.widget.TextView").text("场次").exists()
+    // textContains("请选择场次").exists()
 
-const ticket_option_exists = textContains("¥").exists()
+// 当前处于票档选择界面
+var is_selecting_price = 
+    // textContains("¥").exists()
+    className("android.widget.TextView").text("场次").exists() &&
+    className("android.widget.TextView").text("票档").exists()
+    // textContains("请选择票档").exists()
 
-//存在可购买票种
-const available_ticket_option_exists = 
-    textMatches("¥\\d{1,4}(?!.*缺货登记)").exists()
 
-const available_ticket_option_selected = 
+// 存在可购买票种
+var available_ticket_option_exists =
+    textMatches("¥.+(?!.*缺货登记)").exists()
+
+var available_ticket_option_selected = 
     textContains("数量").exists()
+
+var do_not_refresh = false
+
+
 
 //是否在测试调试，测试时不会点击支付按钮，避免生成过多订单
 var isDebug = false;
 
 //默认参数收集，如果设置了默认值，可以直接使用默认值，不再需要弹窗输入，加快脚本启动进程
 //默认场次信息，例如：05-18,05-19
-var defaultPlayEtcStr;
+var defaultPlayEtcStr = "10-11";
 //默认最高票价，例如：800
 var defaultMaxTicketPrice = 2000;
 //默认观演人，例如：观演人a,观演人b
@@ -55,7 +66,7 @@ function getMaxTicketPrice() {
 
 //获取输入的场次信息
 function getPlayEtc() {
-    var playEtc = rawInput("请输入场次关键字(按照默认格式)", "05-18,05-19");
+    var playEtc = rawInput("请输入场次关键字(按照默认格式)", "10-11,10-12");
     if (playEtc == null || playEtc.trim() == '') {
         alert("请输入场次信息!");
         return getPlayEtc();
@@ -108,38 +119,62 @@ function main() {
 
     threads.start(function () {
         console.log("开启票档扫描线程");
+        textContains("¥").waitFor()
+        log("扫描线程已启动")
         while (true) {
             //当前还在票档界面，就持续扫描
-            while (ticket_option_exists) {
+            var is_selecting_price = textContains("场次").exists() && textContains("票档").exists()
+            while (is_selecting_price) {
                 cycleMonitor(maxTicketPrice, viewers);
-                //75ms扫描一次
-                sleep(75);
+                //20ms扫描一次
+                sleep(25);
             }
             if (isDebug) {
                 console.log("请返回票档页面！");
             }
-            sleep(1000);
+            sleep(500);
         }
     });
-    sleep(1000);
+    sleep(750);
+
+    // 监控刷新逻辑
     while (true) {
-        //只要 当前在场次选择界面 且 未选中有货票种 就 点击刷新余票信息
-        //TODO: （未选中票种 且 存在¥控件缺货登记）
-        if(contains_date_selection &&
-        available_ticket_option_exists &&
-        !available_ticket_option_selected
         
-        )
-        {
-            for(let playEtc of playEtcArr){
-                if(isDebug){
+        //只要 当前在场次选择界面 且 未选中有货票种 就 点击刷新余票信息
+        //TODO: （未选中票种 且 不存在¥控件不包含缺货登记）
+        var is_selecting_date = 
+            className("android.widget.TextView").text("场次").exists()
+            && textContains("请选择场次").exists()
+
+        // 当前处于票档选择界面
+        var is_selecting_price = 
+            className("android.widget.TextView").text("场次").exists()
+            && className("android.widget.TextView").text("票档").exists()
+            && textContains("请选择票档").exists()
+
+        
+        if (is_selecting_date || is_selecting_price) {
+            var available_ticket_option_selected = 
+                textContains("数量").exists()
+            var available_ticket_option_exists =
+                textMatches("¥.+(?!.*缺货登记)").exists()
+
+            for(let playEtc of playEtcArr) {
+                // 如果已选中票种 暂停刷新循环
+                while (available_ticket_option_exists ||        
+                    available_ticket_option_selected || 
+                    bounds(378,1082,702,1403).exists() || // 当开始转圈时 暂停刷新循环
+                    do_not_refresh
+                )
+                {}
+                if (isDebug) {
                     log("刷新场次余票信息："+playEtc)
                 }
-                //刷新余票信息
-                textContains(playEtc).findOne().click();
-                //点击一个场次，间隔时间后继续点击下一个场次
-                sleep(monitorIntervalSeconds * 1000);
+                textContains(playEtc).findOne().click(); // 刷新余票信息
+                
+                sleep(50);
             }
+                //点击一个场次，间隔时间后继续点击下一个场次
         }
     }
 }
@@ -149,6 +184,7 @@ function cycleMonitor(maxTicketPrice, viewers) {
     // textContains("请选择票档").waitFor();
     //获取符合条件的票档数组
     let targetTickets = get_less_than_tickets(maxTicketPrice)
+    do_not_refresh = (l.length > 0);
     for (let amount of targetTickets) {
         log("开冲一个：" + amount);
         doSubmit(amount, viewers);
@@ -202,16 +238,19 @@ function doSubmit(amount, viewers) {
         return false;
     }
     log("尝试次数：" + attemptCnt);
-
     //等待立即支付按钮出现
+    while (!className("android.widget.Button").exists()) {
+        sleep(50);
+    }
     // className("android.widget.Button").waitFor();
-    textContains("立即支付").waitFor();
+    // textContains("立即支付").waitFor();
     //选择对应的观演人
     if(viewersArr.length != 1 || viewers != "默认人"){
         uncheckIfDefaultUserNotInViewer(viewersArr);
         for (let i = 0; i < viewersArr.length; i++) {
             let viewer = viewersArr[i];
             let viewerObj = className("android.widget.TextView").text(viewer).findOne();
+            log(viewerObj.text());
             checkViewer(viewerObj);
         }
     }
@@ -220,8 +259,8 @@ function doSubmit(amount, viewers) {
         console.log("准备点击 ");
         for (let cnt = 0; className("android.widget.Button").exists(); cnt++) {
             //直接猛点就完事了
-            // var c = className("android.widget.Button").findOne().click();
-            var c = textContains("立即支付").findOne().click();
+            var c = className("android.widget.Button").findOne().click();
+            // var c = textContains("立即支付").findOne().click();
             sleep(50);
             if (cnt % 20 == 0) {
                 log("点支付次数:" + cnt + " 可继续等待或返回上一个界面继续刷新其他票档");
@@ -272,19 +311,21 @@ function uncheckViewer(viewerObj) {
  * @param {*} isChecked 当前目标操作是否为选中
  */
 function clickViewerCheckBox(viewerObj, isChecked) {
-    viewerObj.parent().parent().children()
+    // viewerObj.parent().parent().children()
+    viewerObj.parent().children()
     .forEach(function(child){
         // console.log(child.className()+" "+child.text());
-        if(child.className() == "android.widget.Image" ){
+        if(child.className() == "android.view.View" ){
+            checkboxObj = child.findOne(className("android.widget.Image"));
             //当前目标操作为选中 且 当前当前状态为未选中
-            if(isChecked && child.text() == "wc0GRRGh2f2pQAAAABJRU5ErkJggg=="){
+            if(isChecked && checkboxObj.text() == "wc0GRRGh2f2pQAAAABJRU5ErkJggg=="){
                 console.log("选中观演人："+viewerObj.text());
-                child.click();
+                viewerObj.click();
             }
             //当前目标操作为取消选中 且 当前当前状态为选中
-            if(!isChecked && child.text() == "B85bZ04Z1b5tAAAAAElFTkSuQmCC"){
+            if(!isChecked && checkboxObj.text() == "B85bZ04Z1b5tAAAAAElFTkSuQmCC"){
                 console.log("取消选中观演人："+viewerObj.text());
-                child.click();
+                viewerObj.click();
             }
         }
     })
@@ -356,7 +397,7 @@ function get_less_than_tickets(maxTicketPrice) {
         }
     });
     targetTickets.sort(function (a, b) {
-        return a - b;
+        return b - a; // 降序排列
     });
 
     if(isDebug){

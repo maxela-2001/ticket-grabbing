@@ -1,0 +1,5 @@
+# This directory is a Syncthing folder marker.
+# Do not delete.
+
+folderID: ticket-grabbing
+created: 2025-09-15T21:27:42+10:00
