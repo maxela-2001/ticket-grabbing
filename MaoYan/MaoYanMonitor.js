@@ -29,7 +29,7 @@ const available_ticket_option_selected =
     textContains("数量").exists()
 
 //是否在测试调试，测试时不会点击支付按钮，避免生成过多订单
-var isDebug = false;
+var ISDEBUG = false;
 
 //默认参数收集，如果设置了默认值，可以直接使用默认值，不再需要弹窗输入，加快脚本启动进程
 //默认场次信息，例如：05-18,05-19
@@ -115,7 +115,7 @@ function main() {
                 //75ms扫描一次
                 sleep(75);
             }
-            if (isDebug) {
+            if (ISDEBUG) {
                 console.log("请返回票档页面！");
             }
             sleep(1000);
@@ -132,7 +132,7 @@ function main() {
         )
         {
             for(let playEtc of playEtcArr){
-                if(isDebug){
+                if(ISDEBUG){
                     log("刷新场次余票信息："+playEtc)
                 }
                 //刷新余票信息
@@ -184,11 +184,11 @@ function doSubmit(amount, viewers) {
     let attemptCnt = 0;
     let attemptMaxCnt = 500;
     while (text("确认").exists() && attemptCnt <= attemptMaxCnt) {
-        click("确认");if(isDebug){
+        click("确认");if(ISDEBUG){
             console.log("点击确认");
         }
         if (className("android.widget.Button").exists()) {
-            if(isDebug){
+            if(ISDEBUG){
                 console.log("找到支付按钮，准备支付");
             }
             break;
@@ -196,7 +196,7 @@ function doSubmit(amount, viewers) {
         attemptCnt++;
     }
     if (attemptCnt >= attemptMaxCnt && !className("android.widget.Button").exists()) {
-        if(isDebug){
+        if(ISDEBUG){
             console.log("尝试次数过多，继续刷新");
         }
         return false;
@@ -216,7 +216,7 @@ function doSubmit(amount, viewers) {
         }
     }
 
-    if(!isDebug){
+    if(!ISDEBUG){
         console.log("准备点击 ");
         for (let cnt = 0; className("android.widget.Button").exists(); cnt++) {
             //直接猛点就完事了
@@ -359,7 +359,7 @@ function get_less_than_tickets(maxTicketPrice) {
         return a - b;
     });
 
-    if(isDebug){
+    if(ISDEBUG){
         log("符合条件:" + targetTickets);
     }
     return targetTickets;

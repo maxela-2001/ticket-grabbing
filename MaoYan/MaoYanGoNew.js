@@ -6,24 +6,25 @@ openConsole();
 console.setTitle("猫眼 go!", "#ff11ee00", 30);
 
 //确认选票坐标，建议配置（不配置时仍会寻找“确认”按钮进行点击，但可能会出现点击失败的情况）
-const ConfirmX = 867;
-const ConfirmY = 2192;
+const ConfirmX = 878;
+const ConfirmY = 2263;
 
 //是否在测试调试
-var isDebug = false;
+var ISDEBUG = false;
 //调试模式下的模拟票档自动选择的点击坐标
 const debugTicketClickX = 207;
 const debugTicketClickY = 1170;
 
 main();
 
+
 function main() {
-    console.log("开始猫眼抢票!");
+    console.log("开始猫眼抢票主程序!");
     var preBook = text("已 预 约").findOne(2000)
     var preBook2 = className("android.widget.TextView").text("已填写").findOne(2000)
     var isPreBook = preBook2 != null || preBook != null;
     console.log("界面是否已预约：" + isPreBook);
-    if (!isPreBook && !isDebug) {
+    if (!isPreBook && !ISDEBUG) {
         console.log("无预约信息，请提前填写抢票信息!（若已经开票，请到票档界面使用MoYanMonitor.js）");
         return;
     }
@@ -63,7 +64,7 @@ function main() {
 
     //猛点，一直点到出现支付按钮为止
     for (let cnt = 0; cnt >= 0; cnt++) {
-        if (isDebug) {
+        if (ISDEBUG) {
             //调试模式，模拟选择票档，模拟已预约后自动选择票档
             click(debugTicketClickX, debugTicketClickY);
         }
@@ -84,7 +85,7 @@ function main() {
     }
     console.log("②准备确认支付");
 
-    if (!isDebug) {
+    if (!ISDEBUG) {
         //调试模式时不点击支付按钮
         for (let cnt = 0; className("android.widget.Button").exists(); cnt++) {
             //直接猛点就完事了
@@ -100,4 +101,34 @@ function main() {
 
     console.log("结束")
 
+}
+
+
+function get_delay() {
+    let delays = [];
+    for (let i = 0; i < 10; i++) {
+        let start = new Date().getTime();
+        try {
+            // HTTP request to maoyan.com
+            http.get("https://maoyan.com");
+        } catch (e) {
+            console.error("Request failed:", e);
+            // if request fails, record as large delay
+            delays.push(9999);
+            continue;
+        }
+        let end = new Date().getTime();
+        delays.push(end - start);
+        sleep(200); // small pause between requests
+    }
+
+    // sort and remove best (min) and worst (max)
+    delays.sort((a, b) => a - b);
+    let trimmed = delays.slice(1, -1); // drop first and last
+    let sum = trimmed.reduce((acc, v) => acc + v, 0);
+    let avg = sum / trimmed.length;
+
+    console.log("Round trip delays:", delays);
+    console.log("Average delay (without best & worst): " + avg + " ms");
+    return avg;
 }
