@@ -1,127 +1,153 @@
-// 检查无障碍服务是否已经启用，如果没有启用则跳转到无障碍服务启用界面，并等待无障碍服务启动；当无障碍服务启动后脚本会继续运行。
+// 检查无障碍服务是否已经启用，如果没有启用则跳转到无障碍服务启用界面，并等待无障碍服务启动；
+// 当无障碍服务启动后脚本会继续运行。
 auto.waitFor();
 //打开猫眼app
 app.launchApp("猫眼");
 openConsole();
-console.setTitle("猫眼 go!", "#ff11ee00", 30);
-
-//确认选票坐标，建议配置（不配置时仍会寻找“确认”按钮进行点击，但可能会出现点击失败的情况）
-const ConfirmX = 878;
-const ConfirmY = 2263;
+console.setTitle("猫眼 GO!!!!!");
 
 //是否在测试调试
-var ISDEBUG = true;
-//调试模式下的模拟票档自动选择的点击坐标
-var debugTicketClickX = 207;
-var debugTicketClickY = 1170;
+var ISDEBUG = false;
+if (ISDEBUG) {
+  console.log("【调试模式开启，正常使用请编辑脚本ISDEBUG值】");
+}
 
+console.log("【开始脚本】");
 main();
+console.log("【结束脚本】");
 
 function main() {
-  console.log("开始猫眼抢票主程序");
-  textContains("猫眼演出详情").waitFor();
+  console.log("请打开演出详情/确认购票页！");
+  textMatches(/(猫眼演出详情|确认购票)/).waitFor();
 
-  var preBook = text("已 预 约").findOne(2000);
-  var preBook2 = className("android.widget.TextView")
-    .text("已填写")
-    .findOne(2000);
+  if (text("确认购票").exists()) {
+    console.log("当前在确认购票页，直接准备确认支付！！");
+  } else if (text("猫眼演出详情").exists()) {
+    console.log("⓪ 确认预约状态");
 
-  var isPreBook = preBook2 != null || preBook != null;
-  console.log("界面是否已预约：" + isPreBook);
+    var preBook = text("已 预 约").findOne(2000);
+    var preBook2 = className("android.widget.TextView")
+      .text("已填写")
+      .findOne(2000);
 
-  if (!isPreBook && !ISDEBUG) {
-    console.log(
-      "无预约信息，请提前填写抢票信息!（若已经开票，请到票档界面使用MoYanMonitor.js）"
-    );
-    return;
-  }
+    var isPreBook = preBook2 != null || preBook != null;
+    console.log("界面是否已预约：" + isPreBook);
 
-  //出现刷新按钮时点击刷新
-  threads.start(function () {
-    log("刷新按钮自动点击线程已启动");
-    while (true) {
-      textContains("刷新").waitFor();
-      textContains("刷新").findOne().click();
-      //   log("点击刷新...");
-      //避免点击过快
-      sleep(100);
+    if (!isPreBook) {
+      console.log(
+        "无预约信息，请提前填写抢票信息再打开脚本!"
+      );
+      if (!ISDEBUG) {
+        return;
+      }
     }
-  });
 
-  console.log("等待开抢...");
-  while (true) {
-    var but1 = classNameStartsWith("android.widget.").text("立即预订").exists();
-    var but2 = classNameStartsWith("android.widget.").text("立即购票").exists();
-    var but3 = classNameStartsWith("android.widget.").text("特惠购票").exists();
-    //var but4= classNameStartsWith('android.widget.').text("缺货登记").exists();
-    var result = but1 || but2 || but3;
-    if (result) {
-      var s;
-      if (but1) {
-        s = classNameStartsWith("android.widget.")
-          .text("立即预订")
-          .findOne()
-          .click();
-      } else if (but2) {
-        s = classNameStartsWith("android.widget.")
-          .text("立即购票")
-          .findOne()
-          .click();
-      } else if (but3) {
-        s = classNameStartsWith("android.widget.")
-          .text("特惠购票")
+    //出现刷新按钮时点击刷新
+    threads.start(function () {
+      log("刷新按钮自动点击线程已启动");
+      for (let cnt = 0; cnt >= 0; cnt++) {
+        textContains("刷新").waitFor();
+        textContains("刷新").findOne().click();
+        if (cnt != 0 && cnt % 5 == 0) {
+          console.log("已点击刷新次数：" + cnt);
+        }
+        //避免点击过快
+        sleep(100);
+      }
+    });
+
+    console.log("等待开抢...");
+    // textMatches(/(立即预订|立即购票|特惠购票)/).waitFor(); // 减少循环对CPU开支
+    while (true) {
+      var but1 = classNameStartsWith("android.widget.")
+        .text("立即预订")
+        .exists();
+      var but2 = classNameStartsWith("android.widget.")
+        .text("立即购票")
+        .exists();
+      var but3 = classNameStartsWith("android.widget.")
+        .text("特惠购票")
+        .exists();
+      //var but4 = classNameStartsWith('android.widget.').text("缺货登记").exists();
+      var result = but1 || but2 || but3;
+      if (result) {
+        var s;
+        if (but1) {
+          s = classNameStartsWith("android.widget.")
+            .text("立即预订")
+            .findOne()
+            .click();
+        } else if (but2) {
+          s = classNameStartsWith("android.widget.")
+            .text("立即购票")
+            .findOne()
+            .click();
+        } else if (but3) {
+          s = classNameStartsWith("android.widget.")
+            .text("特惠购票")
+            .findOne()
+            .click();
+        }
+        break;
+      }
+    }
+
+    //猛点，一直点到出现支付按钮为止
+    console.log("① 准备确认购票");
+    let cnt = 0;
+    while (true) {
+      // 调试模式，模拟选择票档，模拟已预约后自动选择票档
+      if (
+        ISDEBUG &&
+        !text("确认").exists() &&
+        textContains("请选择").exists() &&
+        cnt == 0
+      ) {
+        let pd = classNameEndsWith("TextView")
+          .textContains("¥")
+          .textMatches(/^(?!.*缺货登记).*$/)
           .findOne()
           .click();
       }
-      break;
-    }
-  }
 
-  //猛点，一直点到出现支付按钮为止
-  console.log("① 准备确认购票");
-  for (let cnt = 0; cnt >= 0; cnt) {
-    if (ISDEBUG && textContains("请选择").exists()) {
-      //调试模式，模拟选择票档，模拟已预约后自动选择票档
-      let pd = textContains("¥").textMatches(/^.*(?!.*缺货登记).*$/).findOne().click();
-      //   click(pd.bounds().centerX(), pd.bounds().centerX());
-    }
-    //绝对坐标点击
-    // press(ConfirmX, ConfirmY, 25);
-    //文字查找按钮点击，避免未正确配置坐标导致的点击失败
-    if (text("确认").exists()) {
-      text("确认").click();
-      cnt++;
-    }
-    sleep(50);
-    if (className("android.widget.Button").exists()) {
-      break;
-    }
-    if (cnt % 20 == 0) {
-      log("已点击确认次数：" + cnt);
+      // 文字查找按钮点击，避免未正确配置坐标导致的点击失败
+      if (text("确认").exists()) {
+        text("确认").findOne().click();
+        cnt++;
+      } else if (cnt != 0) {
+        // break; // 按钮若不复存在时提前结束，避免重复触发
+      }
+      if (
+        textContains("确认购票").exists() ||
+        className("android.widget.Button").exists()
+      ) {
+        break;
+      }
+      sleep(50);
+      if (cnt > 0 && cnt % 20 == 0) {
+        log("已点击确认次数：" + cnt);
+      }
     }
   }
 
   console.log("② 准备确认支付");
-  if (!ISDEBUG) {
+  className("android.widget.Button").waitFor();
+  var payBtn = className("android.widget.Button").text("立即支付").findOne();
+  if (ISDEBUG) {
     //调试模式时不点击支付按钮
-    for (
-      let cnt = 0;
-      className("android.widget.Button").text("立即支付").exists();
-      cnt++
-    ) {
+    console.log("调试模式，不点击支付按钮");
+  } else {
+    for (let cnt = 0; className("android.widget.Button").exists(); cnt++) {
       //直接猛点就完事了
-      //   var c = className("android.widget.Button").text("立即支付").findOne().click();
-      var c = press(payBtn.bounds().centerX(), payBtn.bounds().centerY(), 1);
-      sleep(50);
-      if (cnt % 20 == 0) {
+      // var c1 = payBtn.click();
+      // sleep(25);
+      var c2 = press(payBtn.bounds().centerX(), payBtn.bounds().centerY(), 25);
+      sleep(25);
+      if (cnt > 0 && cnt % 20 == 0) {
         log("已点击支付次数：" + cnt);
       }
     }
-  } else {
-    console.log("调试模式，不点击支付按钮");
   }
-
-  console.log("结束");
   return;
 }
 
